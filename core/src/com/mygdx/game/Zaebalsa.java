@@ -1,6 +1,7 @@
 package com.mygdx.game;
 
 import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.assets.AssetManager;
@@ -12,8 +13,10 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TiledMapRenderer;
+import com.badlogic.gdx.maps.tiled.TiledMapTileLayer;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.BatchTiledMapRenderer;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
@@ -45,6 +48,7 @@ public class Zaebalsa extends ApplicationAdapter {
 	private TiledMap map;
 	private AssetManager assetManager;
 	private OrthogonalTiledMapRenderer tiledMapRenderer;
+	private TiledMapTileLayer collisionLayer;
 
 	private float gravity = -2f; // Гравитация
 	private float jumpVelocity = 30f; // Скорость прыжка
@@ -55,7 +59,6 @@ public class Zaebalsa extends ApplicationAdapter {
 
 		batch = new SpriteBatch();
 		playerTexture = new Texture("player.png");
-		groundTexture = new Texture("ground.jpg");
 		backgroundTexture = new Texture("sky.png");
 // Создаем загрузчик карты
 		TmxMapLoader.Parameters parameters = new TmxMapLoader.Parameters();
@@ -67,7 +70,8 @@ public class Zaebalsa extends ApplicationAdapter {
 			@Override
 			public FileHandle resolve(String fileName) {
 
-				// Проверяем имя файла тайлсета и возвращаем соответствующий FileHandle
+				// Про
+				// веряем имя файла тайлсета и возвращаем соответствующий FileHandle
 				if (fileName.equals("TX Village Props.tsx")) {
 					return Gdx.files.internal("TX Village Props.tsx");
 				}
@@ -75,10 +79,17 @@ public class Zaebalsa extends ApplicationAdapter {
 				 else if (fileName.equals("TX Tileset Ground.tsx")) {
 					return Gdx.files.internal("TX Tileset Ground.tsx");
 				}
+				 else if (fileName.equals("GameMap.tmx"))
+				{
+					return Gdx.files.internal("GameMap.tmx");
+				}
+
+
 
 				return null; // Возвращаем null, если не удалось разрешить путь
 			}
 		};
+		TiledMapTileLayer collisionLayer = (TiledMapTileLayer) map.getLayers().get("Tiled_1");
 
 		// Загружаем карту, указывая загрузчику, путь к карте и FileHandleResolver
 		if (map == null) {
@@ -93,7 +104,7 @@ public class Zaebalsa extends ApplicationAdapter {
 
 
 		// Продолжайте работу с вашей загруженной картой здесь
-		playerPosition = new Vector2(700f, 100f);
+		playerPosition = new Vector2(700f, 96f);
 		playerVelocity = new Vector2(0f, 0f);
 		groundRect = new Rectangle(0f, 0f, Gdx.graphics.getWidth(), 20f);
 		// Инициализация camera перед использованием
@@ -188,6 +199,10 @@ public class Zaebalsa extends ApplicationAdapter {
 		Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+		for (MapLayer layer : map.getLayers()) {
+			System.out.println(layer.getName());
+		}
+
 		handleInput();
 		update();
 
@@ -195,7 +210,8 @@ public class Zaebalsa extends ApplicationAdapter {
 		batch.draw(backgroundTexture, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 		batch.end();
 
-
+		camera.position.set(playerPosition.x, playerPosition.y, 0);
+		camera.update();
 		// Установка области отображения камеры в соответствии с игровым миром
 		camera.update();
 		tiledMapRenderer.setView(camera); // Обновляем вид камеры здесь
@@ -205,8 +221,6 @@ public class Zaebalsa extends ApplicationAdapter {
 
 		batch.begin();
 		batch.draw(playerTexture, playerPosition.x, playerPosition.y,100,100);
-
-		batch.draw(groundTexture, groundRect.x, groundRect.y,Gdx.graphics.getWidth(),50);
 		batch.end();
 
 		// Установка камеры для tiledMapRenderer перед его рендерингом
@@ -227,6 +241,34 @@ public class Zaebalsa extends ApplicationAdapter {
 		if (playerPosition.y < 0) {
 			playerPosition.y = 0f;
 			playerVelocity.y = 0f;
+		}
+		// Проверяем коллизию в текущей позиции игрока по оси X
+		if (playerVelocity.x < 0) {
+			// Движение влево
+			if (collisionLayer.getCell((int) playerPosition.x, (int) playerPosition.y) != null) {
+				// Если есть коллизия, откатываем игрока назад
+				playerPosition.x += 1;
+			}
+		} else if (playerVelocity.x > 0) {
+			// Движение вправо
+			if (collisionLayer.getCell((int) (playerPosition.x + playerTexture.getWidth()), (int) playerPosition.y) != null) {
+				// Если есть коллизия, откатываем игрока назад
+				playerPosition.x -= 1;
+			}
+		}
+		// Проверяем коллизию в текущей позиции игрока по оси Y
+		if (playerVelocity.y < 0) {
+			// Падение вниз
+			if (collisionLayer.getCell((int) playerPosition.x, (int) playerPosition.y) != null) {
+				// Если есть коллизия, останавливаем падение
+				playerVelocity.y = 0;
+			}
+		} else if (playerVelocity.y > 0) {
+			// Подъем вверх
+			if (collisionLayer.getCell((int) playerPosition.x, (int) (playerPosition.y + playerTexture.getHeight())) != null) {
+				// Если есть коллизия, останавливаем подъем
+				playerVelocity.y = 0;
+			}
 		}
 
 		// Ограничение, чтобы игрок не уходил за границы экрана
@@ -255,7 +297,6 @@ public class Zaebalsa extends ApplicationAdapter {
 			playerVelocity.y = jumpVelocity; // Применяем скорость прыжка, если игрок на земле
 		}
 	}
-
 	@Override
 	public void dispose () {
 		batch.dispose();
